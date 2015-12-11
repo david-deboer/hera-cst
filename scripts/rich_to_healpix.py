@@ -1,9 +1,11 @@
-From glob import glob
+from glob import glob
 import cst2hp
+reload(cst2hp)
 import healpy as hp
 import pylab as pl
+import aipy as a
 
-path = '/Users/jaguirre/PyModules/MyModules/herapy/beam/hera-cst/'
+path = '../mdl01/'
 files = glob(path+'*.txt')
 
 #files = files[0:1]
@@ -13,7 +15,12 @@ for file in files:
     root = file.split('/')[-1].split('.')[0]
     d = cst2hp.cst2hp(file,filetype='rich')
     print d['bm32'].min(), d['bm128'].min()
-    hp.write_map(path+root+'_healpix.fits',d['bm128'])
+    # Don't do this
+    #hp.write_map(path+root+'_healpix_new.fits',d['bm128'])
+    # Just lie back and think of aipy
+    h = a.healpix.HealpixMap()
+    h.set_map(d['bm128'])
+    h.to_fits(path+root+'_hpx128.fits')
     #hp.orthview(d['bm32'],rot=[0,90],half_sky=True,title=root)
     hp.orthview(d['bm128'],rot=[0,90],half_sky=True,title=root)
     hp.graticule(dpar=15)

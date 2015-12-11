@@ -2,17 +2,48 @@ import numpy as np
 import healpy as hp
 import pylab as pl
 
+def healpixellize(f_in,theta_in,phi_in,nside,weighted=True):
+    """ A brute force method for converting data f sampled at points theta and phi (not on a healpix grid) into a healpix at resolution nside """
 
-def cst2hp(cstfile,filetype='eloy',column=2):
+    # Input arrays are likely to be rectangular, but this is inconvenient
+    f = f_in.flatten()
+    theta = theta_in.flatten()
+    phi = phi_in.flatten()
+    
+    pix = hp.ang2pix(nside,theta,phi)
+
+    map = np.zeros(hp.nside2npix(nside))
+    hits = np.zeros(hp.nside2npix(nside))
+    
+    # Default method is gridding based on weighted four-point interpolation to
+    # the nearest pixel (from healpy).  Simply finding the nearest pixel is
+    # what will happen if weighted is set to False
+    if (weighted):
+        for i,v in enumerate(f):
+            # Find the nearest pixels to the pixel in question
+            neighbours,weights = hp.get_neighbours(nside,theta[i],phi[i])
+            # Add weighted values to map
+            map[neighbours] += v*weights
+            # Keep track of weights
+            hits[neighbours] += weights
+        map = map/hits
+        wh_no_hits = np.where(hits == 0)
+        map[wh_no_hits[0]] = hp.UNSEEN
+    else:    
+        for i,v in enumerate(f):
+            map[pix[i]] += v
+            hits[pix[i]] +=1
+        map = map/hits
+
+    return (map,hits)
+
+def cst2hp(cstfile,filetype='rich',column=2):
 # It's annoying that the file types are difficul enough to parse that
 # I really need completely different sets of parameters
 
     if filetype == 'eloy':
-        #print 'Eloy'
         skiprows = 3
-
     if filetype == 'rich':
-        #print 'Rich'
         skiprows = 2
         
     # Read in the text file
@@ -21,8 +52,7 @@ def cst2hp(cstfile,filetype='eloy',column=2):
     thetad = data[:,0]
     phid = data[:,1]
 
-    if filetype=='eloy':
-        
+    if filetype=='eloy':        
         # Eloy's coordinates are really hard to parse in the language of
         # spherical coordinates.  Basically, the first column IS theta, but it
         # wraps to both sides of the pole.  The second column is phi, but you
@@ -47,37 +77,22 @@ def cst2hp(cstfile,filetype='eloy',column=2):
     theta = np.radians(thetad)
     phi = np.radians(phid)
 
-    # Third column is E field magnitude, so square and divide by max
+    # For Eloy, third column is E field magnitude, so square and divide by max
     # to get power response
     if filetype=='eloy':
         val = np.power(data[:,column],2)
         val = val/val.max()
 
-    # Third column is dBi    
+    # For Rich, third column is dBi    
     if filetype=='rich':
         val = np.power(10.,data[:,column]/10.)
-        #val = val/val.max()
+        val = val/val.max()
 
     # Original Healpix gridding
     nside=32
     npix = hp.nside2npix(nside)
-
-    map = np.zeros(npix)
-    hits = np.zeros(npix)
-
-    # just straight-up HEALpix-ellize that bitch
-    pix = hp.ang2pix(nside,theta,phi)
-    #print 'Pix values'
-    #print pix.min()
-    #print pix.max()
     
-    # Simplest gridding is
-    #map[pix] = val
-    # This tries to do some averaging
-    for i,v in enumerate(val):
-        map[pix[i]] += v
-        hits[pix[i]] +=1
-    map = map/hits
+    map, hits = healpixellize(val,theta,phi,nside)
 
     # Let's decompose this into a_lm and recompose at higher resolution
     if True:
@@ -90,8 +105,9 @@ def cst2hp(cstfile,filetype='eloy',column=2):
         # Reconstitute at high resolution
         bm = hp.alm2map(alm,nside_synth,lmax=lmax,verbose=False)
         bm = np.power(10.,bm/10.)
+        bm = bm/bm.max()
         
-    return {'data':data,'bm32':map,'bm128':bm}#,'thetad':thetad,'phid':phid,'val':val,'alm':alm,'l':l,'m':m,'hits':hits}
+    return {'data':data,'bm32':map,'bm128':bm}
 
 def theta_cut_at_phi(nside,phi_d_cut,npts=3600):
     """For a HEALpix map of side nside, give the pixel values for a cut that runs -90 < theta < 90 at some phi.  npts should be determinable from nside, but right now I'm lazy"""
