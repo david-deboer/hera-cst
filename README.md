@@ -10,3 +10,5 @@ The png files are orthographic projections of just the response in the forward h
 
 2016 August 23:
 This folder is mis-named in that the data are mostly (only?) from HFSS.  4Y2H_4900 refers to the feed used (172/36/36cm with gap) rigged at 4900mm.  GX contains co-linear-polar gain in dBi and PX the phase in deg for rE.  GY/PY are the cross-pol
+Directory GP4Y2H_4900 has the csv files and HP4Y2H_4900 has the hmap files.
+
